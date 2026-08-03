@@ -20,7 +20,8 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install ruff
-        run: pip install ruff
+        # Pin to a known-good version so lint results are reproducible.
+        run: pip install "ruff==0.16.1"
       - name: Ruff check
         run: ruff check .
 
