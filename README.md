@@ -4,7 +4,7 @@
 
 **Leakage-free deep learning for semiconductor wafer-map defect classification — automated data, Grad-CAM explainability, and one-command reproducible reports.**
 
-[![CI](https://github.com/NayeonKim925/wm-wafer-map/actions/workflows/ci.yml/badge.svg)](https://github.com/NayeonKim925/wm-wafer-map/actions/workflows/ci.yml)
+[![CI](https://github.com/NayeonKim925/wm-wafer-map/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/NayeonKim925/wm-wafer-map/actions/workflows/ci.yml?query=branch%3Amain)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-ee4c2c.svg)](https://pytorch.org/)
 [![Code style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
