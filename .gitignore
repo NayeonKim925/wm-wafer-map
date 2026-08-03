@@ -1,0 +1,75 @@
+# ---------------------------------------------------------------------------
+# Datasets & model outputs
+# The raw WM-811K dataset is NEVER committed. It is downloaded automatically
+# by scripts/download_dataset.py / src.data.DatasetManager at runtime.
+# ---------------------------------------------------------------------------
+datasets/**
+!datasets/
+!datasets/.gitkeep
+!datasets/README.md
+
+outputs/**
+!outputs/
+!outputs/.gitkeep
+!outputs/README.md
+
+# Common dataset artefacts (defence in depth, in case paths are reconfigured)
+*.pkl
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# Kaggle credentials
+kaggle.json
+.kaggle/
+.env
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# ---------------------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store

@@ -1,0 +1,29 @@
+# ===========================================================================
+# Fast smoke-test configuration: a few epochs on a small, capped subset.
+# Useful for verifying the end-to-end pipeline (data -> model -> checkpoint)
+# on a CPU in a couple of minutes.
+#
+#   python train.py --config configs/smoke.yaml
+#
+# Only the keys that differ from configs/default.yaml need to be listed; they
+# are deep-merged on top of the defaults.
+# ===========================================================================
+
+data:
+  image_size: 32
+  batch_size: 64
+  num_workers: 0
+  max_samples: 4000
+
+model:
+  base_channels: 16
+
+training:
+  epochs: 2
+  mixed_precision: false
+  early_stopping_patience: 0
+  optimizer:
+    lr: 0.001
+
+output:
+  experiment_name: smoke

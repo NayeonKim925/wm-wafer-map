@@ -1,0 +1,117 @@
+# ===========================================================================
+# Default configuration for the WM-811K wafer-map defect classifier.
+#
+# Every value here can be overridden without editing this file:
+#   * point to another YAML with        --config path/to/other.yaml
+#   * override single keys on the CLI    --set training.epochs=5 data.batch_size=64
+#
+# NO paths are hardcoded anywhere in the source; they all originate here and
+# are resolved with pathlib relative to the repository root.
+# ===========================================================================
+
+# Global random seed (data splits, weight init, augmentation).
+seed: 42
+
+# Root logging level: DEBUG | INFO | WARNING | ERROR.
+log_level: INFO
+
+# ---------------------------------------------------------------------------
+# Dataset acquisition (handled by src.data.DatasetManager).
+# ---------------------------------------------------------------------------
+dataset:
+  # Kaggle dataset identifier passed to kagglehub.dataset_download().
+  kaggle_handle: qingyi/wm811k-wafer-map
+  # Project-local landing directory (relative paths resolve to the repo root).
+  root_dir: datasets
+  # Sub-directory created under root_dir for this dataset.
+  dataset_name: wm811k
+  # The primary artefact we train on.
+  pickle_filename: LSWMD.pkl
+  # Files that MUST exist for the dataset to be considered "available".
+  expected_files:
+    - LSWMD.pkl
+  # A verified file must be at least this large (guards against truncated
+  # downloads / git-lfs pointer files). WM-811K's pickle is ~2 GB.
+  min_file_size_mb: 100.0
+  # How to expose the downloaded file inside root_dir: "symlink" (no copy,
+  # default) or "copy". Symlinks fall back to copying automatically if the
+  # filesystem forbids them.
+  link_mode: symlink
+  # Force a re-download even if the dataset is already present.
+  force_download: false
+
+# ---------------------------------------------------------------------------
+# Data pipeline (loading, cleaning, splitting, batching).
+# ---------------------------------------------------------------------------
+data:
+  # Every wafer map is resized (nearest-neighbour) to image_size x image_size.
+  image_size: 64
+  # Encoding of the {0: background, 1: pass die, 2: fail die} wafer grid:
+  #   "scalar" -> 1 channel, values mapped to {0.0, 0.5, 1.0}
+  #   "onehot" -> 3 channels, one-hot over {background, pass, fail}
+  representation: onehot
+  # Include the majority "none" (defect-free) class in the label set.
+  include_none: true
+  # Fraction of the data held out for validation / test (stratified).
+  val_split: 0.15
+  test_split: 0.15
+  # DataLoader settings.
+  batch_size: 128
+  num_workers: 4
+  pin_memory: true
+  # Cap the number of samples (per class-balanced load) for quick smoke runs.
+  # null = use the full dataset.
+  max_samples: null
+
+# ---------------------------------------------------------------------------
+# Model architecture (built by src.models.build_model).
+# ---------------------------------------------------------------------------
+model:
+  # Registered architecture name: "wafer_cnn" | "wafer_resnet".
+  name: wafer_cnn
+  # Width of the first conv stage; deeper stages scale from this.
+  base_channels: 32
+  # Dropout probability in the classifier head.
+  dropout: 0.3
+  # num_classes is derived automatically from the label mapping; leave null.
+  num_classes: null
+
+# ---------------------------------------------------------------------------
+# Training loop (src.training.Trainer).
+# ---------------------------------------------------------------------------
+training:
+  epochs: 30
+  # "auto" resolves to cuda -> mps -> cpu; or force "cpu" / "cuda" / "mps".
+  device: auto
+  # Weight the loss by inverse class frequency (WM-811K is very imbalanced).
+  class_weighting: true
+  # Stop early if val macro-F1 does not improve for N epochs (0 disables).
+  early_stopping_patience: 8
+  # Gradient-norm clipping (null disables).
+  grad_clip: 5.0
+  # Automatic mixed precision (only active on CUDA).
+  mixed_precision: true
+  # Batches between training-loss log lines.
+  log_interval: 50
+  # Run evaluation on the held-out test split when training finishes.
+  evaluate_on_test: true
+
+  optimizer:
+    name: adamw          # adam | adamw | sgd
+    lr: 0.001
+    weight_decay: 0.0001
+    momentum: 0.9        # used by sgd only
+
+  scheduler:
+    name: cosine         # cosine | step | none
+    step_size: 10        # used by step only
+    gamma: 0.1           # used by step only
+
+# ---------------------------------------------------------------------------
+# Output locations (all relative paths resolve to the repo root).
+# ---------------------------------------------------------------------------
+output:
+  root_dir: outputs
+  experiment_name: wafer_cnn
+  # Append a run timestamp sub-directory so runs never overwrite each other.
+  timestamp_subdir: true

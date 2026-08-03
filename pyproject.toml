@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wm811k-wafer-map"
+version = "0.1.0"
+description = "Production-quality defect-pattern classifier for the WM-811K wafer-map dataset."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "wm-wafer-map contributors" }]
+keywords = ["wafer-map", "wm-811k", "semiconductor", "defect-classification", "computer-vision", "pytorch"]
+
+dependencies = [
+    "torch>=2.0.0",
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "kagglehub>=0.3.0",
+    "scikit-learn>=1.3.0",
+    "Pillow>=10.0.0",
+    "PyYAML>=6.0",
+    "tqdm>=4.65.0",
+    "matplotlib>=3.7.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4.0", "pytest-cov>=4.1.0", "ruff>=0.1.0"]
+
+[tool.setuptools]
+packages = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "."
+
+# ---------------------------------------------------------------------------
+# Tooling configuration
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+ignore = ["E501"]
