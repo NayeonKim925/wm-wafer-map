@@ -47,6 +47,44 @@ def plot_class_distribution(
     return out
 
 
+def plot_class_prototypes(
+    wafer_maps: list[np.ndarray],
+    labels: np.ndarray,
+    label_mapping: LabelMapping,
+    path: str | Path,
+    seed: int = 42,
+) -> Path | None:
+    """A single horizontal strip with one example wafer per class (a banner)."""
+    plt = get_pyplot()
+    if plt is None:
+        return None
+    from matplotlib.colors import BoundaryNorm, ListedColormap
+
+    out = prepare_output(path)
+    rng = np.random.default_rng(seed)
+    cmap = ListedColormap(_WAFER_COLORS)
+    norm = BoundaryNorm([-0.5, 0.5, 1.5, 2.5], cmap.N)
+
+    n = label_mapping.num_classes
+    fig, axes = plt.subplots(1, n, figsize=(1.5 * n, 2.0), squeeze=False)
+    for col in range(n):
+        ax = axes[0][col]
+        ax.set_xticks([])
+        ax.set_yticks([])
+        candidates = np.where(labels == col)[0]
+        if len(candidates):
+            ax.imshow(
+                np.asarray(wafer_maps[int(rng.choice(candidates))]),
+                cmap=cmap, norm=norm, interpolation="nearest",
+            )
+        ax.set_title(label_mapping.name(col), fontsize=10)
+    fig.tight_layout()
+    fig.savefig(out, dpi=140, bbox_inches="tight")
+    plt.close(fig)
+    logger.info("Saved class-prototype banner to %s", out)
+    return out
+
+
 def plot_sample_wafers(
     wafer_maps: list[np.ndarray],
     labels: np.ndarray,

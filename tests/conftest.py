@@ -48,13 +48,34 @@ def _label_cell(name: str) -> np.ndarray:
     return np.array([[name]], dtype=object)
 
 
+def _add_noise(wafer: np.ndarray, rng: np.random.Generator, noise: float) -> np.ndarray:
+    """Randomly flip a fraction of in-wafer die values (pass<->fail).
+
+    Makes patterns partially ambiguous so a trained model reaches realistic
+    (sub-perfect) accuracy — useful for showcase confusion matrices and error
+    analysis. A no-op when ``noise`` is 0.
+    """
+    if noise <= 0:
+        return wafer
+    inside = wafer > 0
+    flip = inside & (rng.random(wafer.shape) < noise)
+    wafer = wafer.copy()
+    wafer[flip] = np.where(wafer[flip] == 2, 1, 2)
+    return wafer
+
+
 def build_synthetic_frame(
-    n_per_class: int = 12, n_unlabelled: int = 6, n_lots: int = 15, seed: int = 0
+    n_per_class: int = 12,
+    n_unlabelled: int = 6,
+    n_lots: int = 15,
+    noise: float = 0.0,
+    seed: int = 0,
 ) -> pd.DataFrame:
     """Build a DataFrame mirroring the WM-811K pickle schema.
 
     Includes multiple wafers per lot and a mix of official Training/Test flags
-    so lot-aware and official split strategies can be exercised.
+    so lot-aware and official split strategies can be exercised. ``noise``
+    optionally perturbs die values to make classes partially confusable.
     """
     rng = np.random.default_rng(seed)
     rows = []
@@ -63,6 +84,7 @@ def build_synthetic_frame(
             wafer = _make_wafer("none" if name == NONE_CLASS else name, rng)
             if name == NONE_CLASS:
                 wafer[wafer == 2] = 1
+            wafer = _add_noise(wafer, rng, noise)
             official = "Test" if rng.random() < 0.2 else "Training"
             rows.append(
                 {

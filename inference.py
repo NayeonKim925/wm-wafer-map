@@ -36,6 +36,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--device", default=None, help="Force a device (cpu | cuda | mps); default auto."
     )
     parser.add_argument("--output", default=None, help="Optional path to write predictions JSON.")
+    parser.add_argument(
+        "--gallery", default=None, help="Optional path to save a prediction-gallery figure."
+    )
+    parser.add_argument(
+        "--gradcam", default=None, help="Optional path to save a Grad-CAM attention figure."
+    )
     parser.add_argument("--log-level", default="INFO", help="Logging verbosity.")
     parser.add_argument(
         "--limit", type=int, default=20, help="Max predictions to print to the console."
@@ -73,6 +79,24 @@ def main(argv: list[str] | None = None) -> int:
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(results, indent=2), encoding="utf-8")
         print(f"Wrote {len(results)} predictions to {out}")
+
+    if args.gallery:
+        from src.inference.visualize import plot_prediction_gallery
+
+        figure = plot_prediction_gallery(
+            predictor, wafer_maps, args.gallery, max_samples=min(8, len(wafer_maps))
+        )
+        if figure:
+            print(f"Wrote prediction gallery to {figure}")
+
+    if args.gradcam:
+        from src.interpretability import plot_gradcam_gallery
+
+        figure = plot_gradcam_gallery(
+            predictor, wafer_maps, args.gradcam, max_samples=min(8, len(wafer_maps))
+        )
+        if figure:
+            print(f"Wrote Grad-CAM figure to {figure}")
 
     return 0
 

@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "WM-811K Wafer-Map Defect Classifier"
+abstract: >-
+  A production-quality, leakage-free deep-learning pipeline for wafer-map
+  defect-pattern classification on the WM-811K dataset, with automated dataset
+  acquisition, Grad-CAM explainability, and deployment export.
+type: software
+authors:
+  - name: "wm-wafer-map contributors"
+license: MIT
+repository-code: "https://github.com/NayeonKim925/wm-wafer-map"
+keywords:
+  - wafer map
+  - WM-811K
+  - defect classification
+  - computer vision
+  - semiconductor
+  - PyTorch
+references:
+  - type: data
+    title: "WM-811K wafer map dataset"
+    authors:
+      - name: "MIR Lab"
+    url: "https://www.kaggle.com/datasets/qingyi/wm811k-wafer-map"

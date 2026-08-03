@@ -24,9 +24,10 @@ from src.cli import common_parser, create_experiment_dir, load_config_from_args 
 from src.config import ConfigError  # noqa: E402
 from src.data import DatasetError, DatasetManager, WaferDataModule  # noqa: E402
 from src.evaluation import Evaluator, save_training_curves  # noqa: E402
+from src.inference import Predictor  # noqa: E402
 from src.models import build_model  # noqa: E402
+from src.reporting import generate_visual_report  # noqa: E402
 from src.training import Trainer  # noqa: E402
-from src.utils.checkpoint import load_checkpoint  # noqa: E402
 from src.utils.device import resolve_device  # noqa: E402
 from src.utils.logging import get_logger, setup_logging  # noqa: E402
 from src.utils.seed import set_seed  # noqa: E402
@@ -91,14 +92,20 @@ def main(argv: list[str] | None = None) -> int:
     trainer.fit(datamodule.train_dataloader(), datamodule.val_dataloader())
     save_training_curves(trainer.history, run_dir / "training_curves.png")
 
-    # 5. Evaluate the best checkpoint on the held-out test split.
+    # 5. Evaluate the best checkpoint on the held-out test split, then build the
+    #    visual experiment report.
     if config.training.evaluate_on_test:
         best_path = trainer.best_checkpoint_path
         if best_path.is_file():
-            payload = load_checkpoint(best_path, map_location=device)
-            model.load_state_dict(payload["model_state"])
-            evaluator = Evaluator(model, device, datamodule.label_mapping, logger=logger)
-            evaluator.evaluate(datamodule.test_dataloader(), output_dir=run_dir / "evaluation")
+            predictor = Predictor.from_checkpoint(best_path, device=device)
+            evaluator = Evaluator(predictor.model, device, datamodule.label_mapping, logger=logger)
+            results = evaluator.evaluate(
+                datamodule.test_dataloader(), output_dir=run_dir / "evaluation"
+            )
+            if config.output.generate_report:
+                generate_visual_report(
+                    run_dir, config, datamodule, predictor, results, logger=logger
+                )
         else:
             logger.warning("No best checkpoint found; skipping test evaluation.")
 

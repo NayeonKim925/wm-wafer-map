@@ -61,8 +61,13 @@ class Evaluator:
     def evaluate(
         self, loader: DataLoader, output_dir: str | Path | None = None
     ) -> dict:
-        """Evaluate on ``loader`` and, if ``output_dir`` is given, save artefacts."""
-        y_true, y_pred, _ = self.collect_predictions(loader)
+        """Evaluate on ``loader`` and, if ``output_dir`` is given, save artefacts.
+
+        The returned dict includes the raw ``y_true`` / ``y_pred`` / ``y_prob``
+        arrays so downstream reporting (galleries, error analysis, calibration)
+        can reuse them without a second forward pass.
+        """
+        y_true, y_pred, y_prob = self.collect_predictions(loader)
 
         metrics = compute_metrics(y_true, y_pred)
         report = classification_report_dict(y_true, y_pred, self.label_mapping)
@@ -78,7 +83,14 @@ class Evaluator:
             len(y_true),
         )
 
-        results = {"metrics": metrics, "report": report, "confusion_matrix": confusion}
+        results = {
+            "metrics": metrics,
+            "report": report,
+            "confusion_matrix": confusion,
+            "y_true": y_true,
+            "y_pred": y_pred,
+            "y_prob": y_prob,
+        }
         if output_dir is not None:
             self._save(results, Path(output_dir))
         return results

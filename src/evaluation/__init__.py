@@ -8,7 +8,9 @@ from src.evaluation.metrics import (
 )
 from src.evaluation.plots import (
     save_confusion_matrix_plot,
+    save_misclassified_grid,
     save_per_class_f1,
+    save_reliability_diagram,
     save_training_curves,
 )
 
@@ -20,4 +22,6 @@ __all__ = [
     "save_confusion_matrix_plot",
     "save_training_curves",
     "save_per_class_f1",
+    "save_misclassified_grid",
+    "save_reliability_diagram",
 ]

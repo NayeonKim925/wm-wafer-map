@@ -11,10 +11,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from src.data.labels import LabelMapping
 from src.utils.logging import get_logger
 from src.utils.plotting import get_pyplot, prepare_output
 
 logger = get_logger(__name__)
+
+# Wafer cells: 0 = background, 1 = passing die, 2 = failing die.
+_WAFER_COLORS = ["#f0f0f0", "#4C72B0", "#C44E52"]
 
 
 def save_confusion_matrix_plot(
@@ -124,4 +128,109 @@ def save_per_class_f1(report: dict, classes: list[str], path: str | Path) -> Pat
     fig.savefig(out, dpi=150)
     plt.close(fig)
     logger.info("Saved per-class F1 chart to %s", out)
+    return out
+
+
+def save_misclassified_grid(
+    wafer_maps: list,
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    label_mapping: LabelMapping,
+    path: str | Path,
+    max_examples: int = 12,
+    columns: int = 4,
+    seed: int = 42,
+) -> Path | None:
+    """Montage of misclassified wafers (title: true -> predicted). Error analysis."""
+    plt = get_pyplot()
+    if plt is None:
+        return None
+    from matplotlib.colors import BoundaryNorm, ListedColormap
+
+    from src.data.preprocessing import resize_wafer_map
+
+    wrong = np.where(np.asarray(y_true) != np.asarray(y_pred))[0]
+    if len(wrong) == 0:
+        logger.info("No misclassifications to plot.")
+        return None
+
+    out = prepare_output(path)
+    rng = np.random.default_rng(seed)
+    picks = rng.choice(wrong, size=min(max_examples, len(wrong)), replace=False)
+
+    cmap = ListedColormap(_WAFER_COLORS)
+    norm = BoundaryNorm([-0.5, 0.5, 1.5, 2.5], cmap.N)
+    rows = int(np.ceil(len(picks) / columns))
+    fig, axes = plt.subplots(rows, columns, figsize=(2.6 * columns, 2.8 * rows), squeeze=False)
+
+    for cell in range(rows * columns):
+        ax = axes[cell // columns][cell % columns]
+        ax.set_xticks([])
+        ax.set_yticks([])
+        if cell < len(picks):
+            idx = int(picks[cell])
+            display = resize_wafer_map(np.asarray(wafer_maps[idx]), 64)
+            ax.imshow(display, cmap=cmap, norm=norm, interpolation="nearest")
+            ax.set_title(
+                f"true: {label_mapping.name(int(y_true[idx]))}\n"
+                f"pred: {label_mapping.name(int(y_pred[idx]))}",
+                fontsize=8,
+                color="#C62828",
+            )
+        else:
+            ax.axis("off")
+
+    fig.suptitle("Error analysis: misclassified wafers", fontsize=13, y=1.005)
+    fig.tight_layout()
+    fig.savefig(out, dpi=140, bbox_inches="tight")
+    plt.close(fig)
+    logger.info("Saved misclassified grid to %s", out)
+    return out
+
+
+def save_reliability_diagram(
+    y_true: np.ndarray, y_prob: np.ndarray, path: str | Path, n_bins: int = 10
+) -> Path | None:
+    """Calibration (reliability) diagram with the Expected Calibration Error.
+
+    Shows whether predicted confidence matches empirical accuracy — a signal of
+    model calibration that a plain accuracy number hides.
+    """
+    plt = get_pyplot()
+    if plt is None:
+        return None
+    out = prepare_output(path)
+
+    y_true = np.asarray(y_true)
+    y_prob = np.asarray(y_prob)
+    confidence = y_prob.max(axis=1)
+    predictions = y_prob.argmax(axis=1)
+    correct = (predictions == y_true).astype(float)
+
+    bins = np.linspace(0.0, 1.0, n_bins + 1)
+    centres, accuracies, ece = [], [], 0.0
+    for lo, hi in zip(bins[:-1], bins[1:]):
+        mask = (confidence > lo) & (confidence <= hi)
+        centres.append((lo + hi) / 2)
+        if mask.any():
+            acc = correct[mask].mean()
+            accuracies.append(acc)
+            ece += (mask.mean()) * abs(acc - confidence[mask].mean())
+        else:
+            accuracies.append(np.nan)
+
+    fig, ax = plt.subplots(figsize=(5.5, 5.5))
+    ax.plot([0, 1], [0, 1], "--", color="grey", label="perfect calibration")
+    ax.bar(centres, accuracies, width=1.0 / n_bins * 0.9, alpha=0.75,
+           color="#4C72B0", edgecolor="black", label="model")
+    ax.set_xlabel("confidence")
+    ax.set_ylabel("accuracy")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_title(f"Reliability diagram (ECE = {ece:.3f})")
+    ax.legend(loc="upper left")
+    fig.tight_layout()
+    fig.savefig(out, dpi=150)
+    plt.close(fig)
+    logger.info("Saved reliability diagram to %s (ECE=%.3f)", out, ece)
     return out

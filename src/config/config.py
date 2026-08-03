@@ -116,6 +116,11 @@ class OutputConfig:
     root_dir: Path = Path("outputs")
     experiment_name: str = "wafer_cnn"
     timestamp_subdir: bool = True
+    # Generate the rich visual report (galleries, Grad-CAM, error analysis,
+    # reliability diagram, report.md) after training.
+    generate_report: bool = True
+    # Number of wafers shown in the prediction / Grad-CAM galleries.
+    report_samples: int = 8
 
 
 @dataclass

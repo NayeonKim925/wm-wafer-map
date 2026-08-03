@@ -126,3 +126,8 @@ output:
   experiment_name: wafer_cnn
   # Append a run timestamp sub-directory so runs never overwrite each other.
   timestamp_subdir: true
+  # After training, build the visual report.md (galleries, Grad-CAM, error
+  # analysis, calibration) stitched together with the metrics.
+  generate_report: true
+  # Number of wafers shown in the prediction / Grad-CAM galleries.
+  report_samples: 8
