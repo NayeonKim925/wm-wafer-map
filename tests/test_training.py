@@ -60,14 +60,14 @@ def test_predictor_from_checkpoint(make_config, dataset_dir: Path, tmp_path: Pat
     trainer.fit(dm.train_dataloader(), dm.val_dataloader())
 
     predictor = Predictor.from_checkpoint(out_dir / "checkpoints" / "best.pt", device="cpu")
-    wafer = dm._wafer_maps[0]
+    wafer = dm.wafer_maps[0]
 
     single = predictor.predict_one(wafer, top_k=3)
     assert single["predicted_class"] in dm.label_mapping.classes
     assert 0.0 <= single["confidence"] <= 1.0
     assert len(single["top_k"]) == 3
 
-    batch = predictor.predict([wafer, dm._wafer_maps[1]])
+    batch = predictor.predict([wafer, dm.wafer_maps[1]])
     assert len(batch) == 2
 
 
@@ -78,6 +78,6 @@ def test_predictor_probabilities_sum_to_one(make_config, dataset_dir: Path, tmp_
     predictor = Predictor.from_checkpoint(out_dir / "checkpoints" / "best.pt", device="cpu")
 
     # Reconstruct full distribution via a large top_k.
-    result = predictor.predict_one(dm._wafer_maps[0], top_k=dm.num_classes)
+    result = predictor.predict_one(dm.wafer_maps[0], top_k=dm.num_classes)
     total = sum(item["probability"] for item in result["top_k"])
     assert total == np.float32(1.0) or abs(total - 1.0) < 1e-4

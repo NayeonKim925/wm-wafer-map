@@ -16,7 +16,7 @@ from src.evaluation.metrics import (
     compute_metrics,
     confusion_matrix_frame,
 )
-from src.evaluation.plots import save_confusion_matrix_plot
+from src.evaluation.plots import save_confusion_matrix_plot, save_per_class_f1
 from src.utils.logging import get_logger
 
 
@@ -69,10 +69,12 @@ class Evaluator:
         confusion = confusion_matrix_frame(y_true, y_pred, self.label_mapping)
 
         self.logger.info(
-            "Evaluation | accuracy=%.4f f1_macro=%.4f f1_weighted=%.4f (n=%d)",
+            "Evaluation | acc=%.4f bal_acc=%.4f f1_macro=%.4f f1_weighted=%.4f kappa=%.4f (n=%d)",
             metrics["accuracy"],
+            metrics["balanced_accuracy"],
             metrics["f1_macro"],
             metrics["f1_weighted"],
+            metrics["cohen_kappa"],
             len(y_true),
         )
 
@@ -94,5 +96,8 @@ class Evaluator:
         results["confusion_matrix"].to_csv(output_dir / "confusion_matrix.csv")
         save_confusion_matrix_plot(
             results["confusion_matrix"], output_dir / "confusion_matrix.png"
+        )
+        save_per_class_f1(
+            results["report"], self.label_mapping.classes, output_dir / "per_class_f1.png"
         )
         self.logger.info("Saved evaluation artefacts to %s", output_dir)

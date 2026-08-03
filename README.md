@@ -42,20 +42,31 @@ That's it. No manual downloads, no moving files, no data committed to git.
   **never** committed to the repository.
 - **One command to train** — `python train.py` runs download → clean → split →
   train → evaluate, end to end.
+- **Leakage-free evaluation** — group-aware splitting by `lotName` (or the
+  dataset's official split), so correlated wafers from one lot never straddle
+  train and test. This is the difference between honest and inflated numbers.
+- **Fast, correct data loading** — variable-sized wafer maps are resized **once**
+  into a compact `uint8` cache (PIL is off the per-epoch hot path), and
+  augmentation is seeded per DataLoader worker (avoids the classic NumPy-in-
+  workers duplicate-augmentation bug).
 - **Fully configurable, no hardcoded paths** — a single typed YAML config drives
-  everything; every path is resolved with `pathlib` relative to the repo root
-  and overridable on the command line.
+  everything; every path is resolved with `pathlib` and overridable on the CLI.
 - **Clean, modular architecture** — separate, single-responsibility packages for
   data, models, training, evaluation and inference; new models plug in via a
   registry.
+- **Imbalance-aware metrics** — balanced accuracy, macro-F1 and Cohen's κ, not
+  just accuracy (WM-811K is ~85% defect-free).
+- **Visualisations** — dataset EDA (class balance + sample wafer grids),
+  training curves, per-class F1, and a confusion matrix.
+- **Deployment-ready** — one-command TorchScript export with a preprocessing
+  sidecar, loadable by LibTorch/TorchServe with none of this codebase.
 - **Proper logging** — the `logging` module throughout; `print()` is reserved
   for user-facing CLI output only.
-- **Robust error handling** — download and verification failures produce clear,
-  actionable messages (e.g. how to set Kaggle credentials).
-- **Reproducible** — global seeding, and self-describing checkpoints that carry
-  their own config and label mapping.
-- **Tested** — a `pytest` suite validates the whole pipeline on synthetic data
-  (no 2 GB download required) with `kagglehub` mocked.
+- **Reproducible** — global + per-worker seeding, and self-describing
+  checkpoints that carry their own config and label mapping.
+- **Tested** — a `pytest` suite (70+ tests) validates the whole pipeline on
+  synthetic data (no 2 GB download) with `kagglehub` mocked, including a
+  no-lot-leakage assertion.
 
 ## Quickstart
 
@@ -134,16 +145,19 @@ wm-wafer-map/
 │   └── smoke.yaml           # Fast CPU smoke-test overrides
 │
 ├── scripts/
-│   └── download_dataset.py  # Standalone dataset downloader/verifier
+│   ├── download_dataset.py  # Standalone dataset downloader/verifier
+│   ├── visualize_dataset.py # Dataset EDA (class balance + sample wafers)
+│   └── export_model.py      # Export a checkpoint to TorchScript for serving
 │
 ├── src/                     # Importable source package
 │   ├── cli.py               # Shared CLI helpers (arg parsing, run dirs)
 │   ├── config/              # Typed, hierarchical config (dataclasses + YAML)
 │   ├── data/                # Dataset acquisition, cleaning, batching
 │   │   ├── dataset_manager.py   # DatasetManager: locate/download/verify
-│   │   ├── dataset.py           # WaferMapDataset + WM-811K loader
-│   │   ├── datamodule.py        # Stratified train/val/test dataloaders
+│   │   ├── dataset.py           # WaferMapDataset + WM-811K loader + augment
+│   │   ├── datamodule.py        # Leakage-free train/val/test dataloaders
 │   │   ├── preprocessing.py     # Resize/encode wafer maps, clean labels
+│   │   ├── visualize.py         # Class-distribution + sample-wafer figures
 │   │   └── labels.py            # Class definitions + LabelMapping
 │   ├── models/              # Architectures + build registry
 │   │   ├── cnn.py               # WaferCNN
@@ -152,8 +166,8 @@ wm-wafer-map/
 │   │   └── factory.py           # register_model / build_model
 │   ├── training/            # Trainer, optimizers, schedulers
 │   ├── evaluation/          # Metrics, evaluator, plots
-│   ├── inference/           # Predictor for new wafer maps
-│   └── utils/               # Logging, seeding, device, paths, checkpoints
+│   ├── inference/           # Predictor + TorchScript export
+│   └── utils/               # Logging, seeding, device, paths, plotting
 │
 ├── datasets/                # Auto-populated, git-ignored (data lives here)
 ├── outputs/                 # Auto-populated, git-ignored (checkpoints, logs)
@@ -207,21 +221,63 @@ outputs/wafer_cnn/<timestamp>/
 ├── train.log                   # full training log
 ├── label_mapping.json          # class index <-> name mapping
 ├── history.json                # per-epoch metrics
+├── training_curves.png         # loss & macro-F1 vs epoch (train/val)
 ├── checkpoints/
 │   ├── best.pt                 # best by validation macro-F1
 │   └── last.pt                 # most recent epoch
 └── evaluation/                 # test-split metrics (if enabled)
     ├── classification_report.json
     ├── confusion_matrix.csv
-    └── confusion_matrix.png
+    ├── confusion_matrix.png
+    └── per_class_f1.png
 ```
 
 **What training does:** resolves the device (CUDA → MPS → CPU), auto-downloads
-the data, builds stratified train/val/test splits, trains with a
-class-weighted loss (WM-811K is heavily imbalanced), cosine LR schedule,
-gradient clipping, optional mixed precision, early stopping on validation
-macro-F1, checkpointing, and a final evaluation of the best model on the test
-split.
+the data, builds a **leakage-free split** (see below), caches resized wafer
+maps, trains with a class-weighted loss (WM-811K is heavily imbalanced), cosine
+LR schedule, gradient clipping, optional mixed precision, early stopping on
+validation macro-F1, checkpointing, and a final evaluation of the best model on
+the held-out test split.
+
+## Data splitting & evaluation protocol
+
+How the data is split is the single biggest driver of whether reported numbers
+are honest. WM-811K wafers are grouped into **lots** processed under shared
+conditions, so wafers from one lot are strongly correlated. Splitting them
+randomly leaks information from test into train and **inflates** results. This
+project defaults to a leakage-free protocol (`data.split_strategy`):
+
+| Strategy | Leakage-free | Use it for |
+| --- | --- | --- |
+| `lot` (default) | ✅ no lot spans two splits | Honest generalisation to unseen lots |
+| `official` | ✅ train⊥val by lot; test = dataset's own `trianTestLabel` | Comparability with published WM-811K benchmarks¹ |
+| `random` | ❌ | Quick experiments only — expect optimistic metrics |
+
+```bash
+python train.py --set data.split_strategy=lot        # default, leakage-free
+python train.py --set data.split_strategy=official   # dataset's own train/test
+python train.py --set data.split_strategy=random     # fast but biased
+```
+
+¹ The dataset's official `Training`/`Test` flag is assigned per wafer and is not
+guaranteed lot-disjoint, so `official` can still share lots between train and
+test — that's a property of the dataset, and precisely why `lot` exists.
+
+For a rigorous result, run several seeds and report mean ± std
+(`--set seed=0`, `seed=1`, …); the split, weight init and augmentation all key
+off the global seed. (k-fold cross-validation is a natural extension.)
+
+## Dataset visualisation (EDA)
+
+Understand the data before trusting a model:
+
+```bash
+python scripts/visualize_dataset.py                       # writes to outputs/eda/
+python scripts/visualize_dataset.py --examples 8 --output-dir reports/eda
+```
+
+Produces a class-distribution chart (the imbalance is stark) and a grid of
+sample wafer maps per class (what each defect pattern actually looks like).
 
 ## Evaluation
 
@@ -235,8 +291,23 @@ python evaluate.py --checkpoint <ckpt> --split val
 python evaluate.py --checkpoint <ckpt> --output-dir reports/eval1
 ```
 
-Reported metrics: accuracy, macro/weighted precision-recall-F1, a full
-per-class report, and a confusion matrix (CSV + PNG heatmap).
+**Reported metrics** (chosen for a heavily imbalanced problem): accuracy,
+**balanced accuracy** (mean per-class recall), macro/weighted precision-recall-F1,
+**Cohen's κ**, a full per-class report, a confusion matrix (CSV + normalised
+heatmap), and a per-class F1 bar chart.
+
+## Deployment (TorchScript export)
+
+Export a trained checkpoint to a self-contained TorchScript module that loads
+with `torch.jit.load` — no dependency on this codebase — for LibTorch/TorchServe:
+
+```bash
+python scripts/export_model.py --checkpoint <ckpt> --output outputs/export/model.ts.pt
+```
+
+A JSON sidecar records the preprocessing contract (input channels, image size,
+class order) the serving side needs. (For newer runtimes, `torch.export`/ONNX
+are natural alternatives.)
 
 ## Inference
 
@@ -274,8 +345,10 @@ classes — eight defect patterns plus defect-free:
 
 The pipeline cleans the dataset's quirky nested-array labels, drops unlabelled
 rows, optionally excludes the majority `none` class, resizes each map to a fixed
-resolution with categorical-preserving nearest-neighbour interpolation, and
-encodes it as either a single scaled channel or a 3-channel one-hot tensor.
+resolution with categorical-preserving nearest-neighbour interpolation (**once**,
+into a cached `uint8` stack), and encodes it as either a single scaled channel or
+a 3-channel one-hot tensor. The `lotName` and official train/test flag are
+retained so splitting can be leakage-free (see above).
 
 ## Architecture & design
 
@@ -287,14 +360,15 @@ one responsibility each and no duplicated logic:
 - **`DatasetManager`** owns data acquisition and integrity — nothing else knows
   how the data got there.
 - **`WaferDataModule`** owns loading/cleaning/splitting/batching and exposes
-  dataloaders + class weights.
+  dataloaders + class weights. Splitting is pluggable (`lot` / `official` /
+  `random`) and leakage-free by default.
 - **Model registry.** Add an architecture by decorating a builder with
   `@register_model("name")`; `build_model` and the config pick it up with no
   other changes.
-- **`Trainer` / `Evaluator` / `Predictor`** are cleanly separated; metrics live
-  in one place and are shared.
+- **`Trainer` / `Evaluator` / `Predictor`** are cleanly separated; metrics and
+  plotting helpers live in one place and are shared (no duplicated logic).
 - **Self-describing checkpoints** carry weights + model config + label mapping +
-  run config, so evaluation and inference need nothing external.
+  run config, so evaluation, inference and export need nothing external.
 
 Extending it is easy: register a new model in `src/models/`, add a new data
 representation in `src/data/preprocessing.py`, or point `--config` at your own
@@ -302,8 +376,10 @@ YAML.
 
 ## Testing
 
-The suite runs the entire pipeline on a small **synthetic** dataset with the
-exact WM-811K schema, and mocks `kagglehub`, so no large download is needed:
+The suite (70+ tests) runs the entire pipeline on a small **synthetic** dataset
+with the exact WM-811K schema, and mocks `kagglehub`, so no large download is
+needed. It includes an explicit **no-lot-leakage** assertion for the `lot` and
+`official` splits, a TorchScript round-trip check, and worker-seeding tests:
 
 ```bash
 pip install -r requirements-dev.txt

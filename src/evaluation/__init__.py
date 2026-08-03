@@ -6,7 +6,11 @@ from src.evaluation.metrics import (
     compute_metrics,
     confusion_matrix_frame,
 )
-from src.evaluation.plots import save_confusion_matrix_plot
+from src.evaluation.plots import (
+    save_confusion_matrix_plot,
+    save_per_class_f1,
+    save_training_curves,
+)
 
 __all__ = [
     "Evaluator",
@@ -14,4 +18,6 @@ __all__ = [
     "classification_report_dict",
     "confusion_matrix_frame",
     "save_confusion_matrix_plot",
+    "save_training_curves",
+    "save_per_class_f1",
 ]

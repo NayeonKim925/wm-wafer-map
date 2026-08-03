@@ -2,7 +2,7 @@
 .DEFAULT_GOAL := help
 PYTHON ?= python3
 
-.PHONY: help install install-dev download train train-smoke evaluate test lint clean
+.PHONY: help install install-dev download eda train train-smoke evaluate export test lint clean
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -17,6 +17,9 @@ install-dev:  ## Install runtime + dev dependencies
 download:  ## Download and verify the dataset
 	$(PYTHON) scripts/download_dataset.py
 
+eda:  ## Generate dataset EDA figures (class balance + sample wafers)
+	$(PYTHON) scripts/visualize_dataset.py
+
 train:  ## Train with the default config
 	$(PYTHON) train.py
 
@@ -25,6 +28,9 @@ train-smoke:  ## Fast CPU smoke run (small subset, few epochs)
 
 evaluate:  ## Evaluate a checkpoint (pass CKPT=path/to/best.pt)
 	$(PYTHON) evaluate.py --checkpoint $(CKPT)
+
+export:  ## Export a checkpoint to TorchScript (pass CKPT=path/to/best.pt)
+	$(PYTHON) scripts/export_model.py --checkpoint $(CKPT)
 
 test:  ## Run the test suite
 	$(PYTHON) -m pytest

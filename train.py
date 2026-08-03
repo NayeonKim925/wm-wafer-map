@@ -23,7 +23,7 @@ if str(_REPO_ROOT) not in sys.path:
 from src.cli import common_parser, create_experiment_dir, load_config_from_args  # noqa: E402
 from src.config import ConfigError  # noqa: E402
 from src.data import DatasetError, DatasetManager, WaferDataModule  # noqa: E402
-from src.evaluation import Evaluator  # noqa: E402
+from src.evaluation import Evaluator, save_training_curves  # noqa: E402
 from src.models import build_model  # noqa: E402
 from src.training import Trainer  # noqa: E402
 from src.utils.checkpoint import load_checkpoint  # noqa: E402
@@ -89,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
         logger=logger,
     )
     trainer.fit(datamodule.train_dataloader(), datamodule.val_dataloader())
+    save_training_curves(trainer.history, run_dir / "training_curves.png")
 
     # 5. Evaluate the best checkpoint on the held-out test split.
     if config.training.evaluate_on_test:

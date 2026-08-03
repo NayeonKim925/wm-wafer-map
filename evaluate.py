@@ -104,8 +104,8 @@ def main(argv: list[str] | None = None) -> int:
 
     metrics = results["metrics"]
     print(f"\nEvaluation on '{args.split}' split ({checkpoint_path.name}):")
-    for key in ("accuracy", "f1_macro", "f1_weighted"):
-        print(f"  {key:12s}: {metrics[key]:.4f}")
+    for key in ("accuracy", "balanced_accuracy", "f1_macro", "f1_weighted", "cohen_kappa"):
+        print(f"  {key:18s}: {metrics[key]:.4f}")
     print(f"Artefacts: {output_dir}")
     return 0
 

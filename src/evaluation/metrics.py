@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import (
     accuracy_score,
+    balanced_accuracy_score,
+    cohen_kappa_score,
     confusion_matrix,
     f1_score,
     precision_score,
@@ -17,15 +19,22 @@ from src.data.labels import LabelMapping
 
 
 def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
-    """Return headline scalar metrics (accuracy + macro/weighted P/R/F1)."""
+    """Return headline scalar metrics.
+
+    For WM-811K, which is dominated by the ``none`` class, plain accuracy is
+    misleading; ``balanced_accuracy`` (mean per-class recall), ``f1_macro`` and
+    Cohen's ``kappa`` (chance-corrected agreement) are the metrics to watch.
+    """
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
     return {
         "accuracy": float(accuracy_score(y_true, y_pred)),
+        "balanced_accuracy": float(balanced_accuracy_score(y_true, y_pred)),
         "precision_macro": float(precision_score(y_true, y_pred, average="macro", zero_division=0)),
         "recall_macro": float(recall_score(y_true, y_pred, average="macro", zero_division=0)),
         "f1_macro": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
         "f1_weighted": float(f1_score(y_true, y_pred, average="weighted", zero_division=0)),
+        "cohen_kappa": float(cohen_kappa_score(y_true, y_pred)),
     }
 
 

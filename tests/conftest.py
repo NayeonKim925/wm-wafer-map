@@ -48,8 +48,14 @@ def _label_cell(name: str) -> np.ndarray:
     return np.array([[name]], dtype=object)
 
 
-def build_synthetic_frame(n_per_class: int = 12, n_unlabelled: int = 6, seed: int = 0) -> pd.DataFrame:
-    """Build a DataFrame mirroring the WM-811K pickle schema."""
+def build_synthetic_frame(
+    n_per_class: int = 12, n_unlabelled: int = 6, n_lots: int = 15, seed: int = 0
+) -> pd.DataFrame:
+    """Build a DataFrame mirroring the WM-811K pickle schema.
+
+    Includes multiple wafers per lot and a mix of official Training/Test flags
+    so lot-aware and official split strategies can be exercised.
+    """
     rng = np.random.default_rng(seed)
     rows = []
     for name in list(DEFECT_CLASSES) + [NONE_CLASS]:
@@ -57,13 +63,14 @@ def build_synthetic_frame(n_per_class: int = 12, n_unlabelled: int = 6, seed: in
             wafer = _make_wafer("none" if name == NONE_CLASS else name, rng)
             if name == NONE_CLASS:
                 wafer[wafer == 2] = 1
+            official = "Test" if rng.random() < 0.2 else "Training"
             rows.append(
                 {
                     "waferMap": wafer,
                     "dieSize": float(wafer.size),
-                    "lotName": f"lot{int(rng.integers(0, 5))}",
+                    "lotName": f"lot{int(rng.integers(0, n_lots))}",
                     "waferIndex": float(rng.integers(1, 25)),
-                    "trianTestLabel": _label_cell("Training"),
+                    "trianTestLabel": _label_cell(official),
                     "failureType": _label_cell(name),
                 }
             )
@@ -73,7 +80,7 @@ def build_synthetic_frame(n_per_class: int = 12, n_unlabelled: int = 6, seed: in
             {
                 "waferMap": wafer,
                 "dieSize": float(wafer.size),
-                "lotName": "lotX",
+                "lotName": f"lot{int(rng.integers(0, n_lots))}",
                 "waferIndex": 1.0,
                 "trianTestLabel": np.array([[]], dtype=object),
                 "failureType": np.array([[]], dtype=object),

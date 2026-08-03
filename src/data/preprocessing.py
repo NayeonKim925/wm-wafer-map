@@ -98,3 +98,22 @@ def preprocess_wafer_map(
     """Full pipeline: resize then encode into a ``(C, H, W)`` float32 array."""
     resized = resize_wafer_map(wafer, image_size)
     return encode_wafer_map(resized, representation)
+
+
+def resize_wafer_stack(
+    wafer_maps: list[np.ndarray], image_size: int, logger=None
+) -> np.ndarray:
+    """Resize a list of wafer maps once into a compact ``(N, H, W)`` uint8 array.
+
+    Resizing is the expensive, deterministic part of preprocessing; doing it
+    once and caching the result removes it from the per-batch hot path.  The
+    categorical ``{0, 1, 2}`` values fit in ``uint8``, so the whole labelled
+    subset stays small in memory.
+    """
+    count = len(wafer_maps)
+    stack = np.zeros((count, image_size, image_size), dtype=np.uint8)
+    for i, wafer in enumerate(wafer_maps):
+        stack[i] = resize_wafer_map(wafer, image_size)
+        if logger is not None and count >= 50_000 and (i + 1) % 25_000 == 0:
+            logger.info("Resized %d/%d wafer maps...", i + 1, count)
+    return stack

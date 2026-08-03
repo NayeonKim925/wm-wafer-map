@@ -55,8 +55,17 @@ class DataConfig:
     image_size: int = 64
     representation: str = "onehot"
     include_none: bool = True
+    # How train/val/test are separated:
+    #   "lot"      -> group-aware split by lotName (no wafers from one lot leak
+    #                 across splits); the leakage-free default.
+    #   "official" -> use the dataset's own trianTestLabel Training/Test split
+    #                 (comparable to published WM-811K benchmarks).
+    #   "random"   -> plain stratified random split (fast, but leaks lots).
+    split_strategy: str = "lot"
     val_split: float = 0.15
     test_split: float = 0.15
+    # Enable label-preserving flip / 90-degree-rotation augmentation on train.
+    augment: bool = True
     batch_size: int = 128
     num_workers: int = 4
     pin_memory: bool = True

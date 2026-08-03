@@ -99,6 +99,28 @@ class Predictor:
         """Classify a single wafer map."""
         return self.predict([np.asarray(wafer_map)], top_k=top_k)[0]
 
+    # -- Deployment ---------------------------------------------------------
+    def export_torchscript(self, path: str | Path) -> Path:
+        """Serialise the model to a self-contained TorchScript module.
+
+        Prefers scripting (control-flow-safe); falls back to tracing on a dummy
+        input. The result loads with ``torch.jit.load`` and needs none of this
+        codebase — suitable for a serving runtime.
+        """
+        out = Path(path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        channels = num_input_channels(self.representation)
+        example = torch.zeros(1, channels, self.image_size, self.image_size, device=self.device)
+        self.model.eval()
+        try:
+            module = torch.jit.script(self.model)
+        except Exception as exc:  # noqa: BLE001 - tracing is a valid fallback
+            logger.warning("torch.jit.script failed (%s); falling back to tracing.", exc)
+            module = torch.jit.trace(self.model, example)
+        module.save(str(out))
+        logger.info("Exported TorchScript model to %s", out)
+        return out
+
     # -- Helpers ------------------------------------------------------------
     @staticmethod
     def _as_list(wafer_maps: np.ndarray | Sequence[np.ndarray]) -> list[np.ndarray]:

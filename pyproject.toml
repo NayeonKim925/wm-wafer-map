@@ -39,6 +39,13 @@ packages = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra -q"
+filterwarnings = [
+    # TorchScript export is deprecated in very recent torch but remains the
+    # standard LibTorch/TorchServe format; we consciously use it. Silence only
+    # this specific third-party deprecation so genuine warnings stay visible.
+    "ignore::DeprecationWarning:torch.jit._script",
+    "ignore::DeprecationWarning:torch.jit._serialization",
+]
 
 [tool.ruff]
 line-length = 100

@@ -52,14 +52,25 @@ data:
   representation: onehot
   # Include the majority "none" (defect-free) class in the label set.
   include_none: true
-  # Fraction of the data held out for validation / test (stratified).
+  # How to separate train/val/test:
+  #   lot      -> group-aware split by lotName; wafers from the same lot never
+  #               leak across splits (leakage-free default, the correct choice
+  #               for honest evaluation of a fab dataset).
+  #   official -> use the dataset's own trianTestLabel (Training/Test), for
+  #               comparability with published WM-811K benchmarks.
+  #   random   -> plain stratified random split (fast but optimistically biased
+  #               because correlated lots span splits).
+  split_strategy: lot
+  # Fractions held out for validation / test.
   val_split: 0.15
   test_split: 0.15
+  # Label-preserving flip / 90-degree-rotation augmentation on the train split.
+  augment: true
   # DataLoader settings.
   batch_size: 128
   num_workers: 4
   pin_memory: true
-  # Cap the number of samples (per class-balanced load) for quick smoke runs.
+  # Cap the number of samples (class-stratified) for quick smoke runs.
   # null = use the full dataset.
   max_samples: null
 
